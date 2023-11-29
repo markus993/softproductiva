@@ -1,11 +1,11 @@
 $ = jQuery;
 $().ready(function() {
 
-	jQuery.validator.setDefaults({
-		debug: true,
-		success: "valid"
-	});
 	modeloChange('');
+
+	$('#adjuntos').MultiFile({
+		list: '#file-list'
+	});
 
 	$('#modelo').on('change', function() {
 		modeloChange(this.value);
@@ -46,40 +46,34 @@ $().ready(function() {
 		});
 	}
 
-
-	$('#submit').on('click', function(event) {
-		$('#total').prop( "disabled", false );
-		items = $("#fg-form").serializeArray();
-		$('#total').prop( "disabled", true );
-    var data_array = new Array();
-		$(items).each(function(){
-			item = $("input[name='"+this.name+"'],select[name='"+this.name+"'] option:selected");
-			console.info(item);
-			var item_array = {};
-			if (typeof item.data('value') !== "undefined") {
-				item_array['data-value'] = item.data('value');
-			}
-			if (typeof item.attr("name") !== "undefined") {
-				item_array['name'] = item.attr("name");
-			}else{
-				item_array['name'] = item.parent().attr("name");
-			}
-			item_array['value'] = item.val();
-			data_array.push(item_array);
-		});
-		console.log(custom_js);
-		jQuery.ajax({
-			type : "post",
-			dataType : "json",
-			url : custom_js.ajax_url,
-			data : {action: "crea_cotizacion_tesla", data : data_array},
-			success: function(response) {
-				console.log(response);
-				if (Number.isInteger(response)) {
-
+	$('#fg-form').on('submit', function(event) {
+		event.preventDefault();
+		if ($("#fg-form")[0].checkValidity()){
+			$('#total').prop( "disabled", false );
+			let data = new FormData($("#fg-form")[0]);
+			$('#total').prop( "disabled", true );
+			$.ajax({
+				url : custom_js.ajax_url,
+				method: 'POST',
+				type: 'POST', // For jQuery < 1.9
+				data : data,
+				processData: false,
+				contentType: false,
+				success: function(response) {
+					var json = $.parseJSON(response);
+					if (json.success) {
+						$('#confirmacionModal').modal('show');
+					}
+					console.log(json);
 				}
-			}
-		});
+			});
+		} else {
+			$("#fg-form")[0].reportValidity()
+		}
+	});
+
+	$('#close').on('click', function() {
+		window.location.reload();
 	});
 
 	$("#fg-form").validate();

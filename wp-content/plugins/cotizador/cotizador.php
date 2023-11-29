@@ -19,36 +19,80 @@ function crea_cotizacion_tesla()
 {
   $now = new DateTime('now', new DateTimeZone('America/Bogota'));
   $fecha = $now->format('Y-m-d H:i:s');
-  $data = $_POST['data'];
-  //var_dump($data);
-  $nombres = $data[0]['value'];
-  $apellidos = $data[1]['value'];
-  $id = $data[3]['value'];
-  $modelo = $data[5]['data-value'];
-  $titulo = $id.' '.$nombres.' '.$apellidos.' '.$modelo.' '.$fecha;
+
+  $data = array();
+
+  foreach ($_POST as $key => $value) {
+    $data[] = $value;
+  }
+  $nombres = $data[1];
+  $apellidos = $data[2];
+  $id = $data[4];
+  $modelo = $data[8];
+  $titulo = $id . ' ' . $nombres . ' ' . $apellidos . ' ' . $modelo . ' ' . $fecha;
   $cotizacion = array(
     'post_title' => $titulo,
     'post_content' => '',
-    'post_status' => 'publish',
+    'post_status' => 'private',
     'post_type' => 'cotizacion'
   );
   $cotizacion_id = wp_insert_post($cotizacion);
 
-  update_post_meta($cotizacion_id, 'nombres', $nombres);
-  update_post_meta($cotizacion_id, 'apellidos', $apellidos);
-  update_post_meta($cotizacion_id, 'tipo_identificacion', $data[2]['value']);
-  update_post_meta($cotizacion_id, 'correo_electronico', $data[4]['value']);
-  update_post_meta($cotizacion_id, 'modelo', $data[5]['value']);
-  update_post_meta($cotizacion_id, 'traccion', $data[6]['value']);
-  update_post_meta($cotizacion_id, 'color', $data[7]['value']);
-  update_post_meta($cotizacion_id, 'ruedas', $data[8]['value']);
-  update_post_meta($cotizacion_id, 'interiores', $data[9]['value']);
-  update_post_meta($cotizacion_id, 'identificacion', $id);
-  update_post_meta($cotizacion_id, 'valor', $data[10]['value']);
-  update_post_meta($cotizacion_id, 'json_data', json_encode($data, true));
+  // CAMPOS
+  update_field('nombres', $nombres, $cotizacion_id);
+  update_field('apellidos', $apellidos, $cotizacion_id);
+  update_field('tipo_identificacion', $data[3], $cotizacion_id);
+  update_field('identificacion', $id, $cotizacion_id);
+  update_field('direccion', $data[5], $cotizacion_id);
+  update_field('correo_electronico', $data[6], $cotizacion_id);
+  update_field('observaciones', $data[7], $cotizacion_id);
+  update_field('modelo', $modelo, $cotizacion_id);
+  update_field('traccion', $data[9], $cotizacion_id);
+  update_field('color', $data[10], $cotizacion_id);
+  update_field('ruedas', $data[11], $cotizacion_id);
+  update_field('interiores', $data[12], $cotizacion_id);
+  update_field('valor', $data[13], $cotizacion_id);
+  update_field('json_data', json_encode($data, true), $cotizacion_id);
 
-  echo $cotizacion_id;
-
+  // ANEXOS
+  if (!empty($_FILES['adjuntos']['name'][0])) {
+    $files = $_FILES['adjuntos'];
+    foreach ($files['name'] as $key => $file) {
+      $array_file = array(
+        'name' => $files['name'][$key],
+        'full_path' => $files['full_path'][$key],
+        'type' => $files['type'][$key],
+        'tmp_name' => $files['tmp_name'][$key],
+        'error' => $files['error'][$key],
+        'size' => $files['size'][$key],
+      );
+      $upload = wp_handle_upload(
+        $array_file,
+        array('test_form' => false)
+      );
+      $attachment_id = wp_insert_attachment(
+        array(
+          'guid' => $upload['url'],
+          'post_mime_type' => $upload['type'],
+          'post_title' => basename($upload['file']),
+          'post_content' => '',
+          'post_status' => 'inherit',
+        ),
+        $upload['file'],
+        $cotizacion_id
+      );
+      wp_update_attachment_metadata(
+        $attachment_id,
+        wp_generate_attachment_metadata($attachment_id, $upload['file'])
+      );
+      add_post_meta($cotizacion_id, 'anexos', $attachment_id);
+    }
+  }
+  $response = array(
+    'success'=> true,
+    'ID'=> $cotizacion_id,
+  );
+  echo json_encode($response);
   wp_die(); // this is required to terminate immediately and return a proper response
 }
 
@@ -63,6 +107,7 @@ function wpse255804_redirect_page_template($template)
 {
   $post = get_post();
   $page_template = get_post_meta($post->ID, '_wp_page_template', true);
+
   if ('cotizador-template.php' == basename($page_template))
     $template = WP_PLUGIN_DIR . '/cotizador/cotizador-template.php';
   return $template;
